@@ -1,6 +1,6 @@
 # Email Agent
 
-> A local-first AI email assistant for Gmail. Triages your inbox, drafts replies,
+> A local-first AI email assistant for Gmail only. Triages your inbox, drafts replies,
 > groups senders, and keeps sensitive content on your own machine.
 
 Runs as a FastAPI web app on `localhost:8000`. Nothing is hosted; all data lives
