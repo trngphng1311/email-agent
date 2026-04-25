@@ -1,0 +1,23 @@
+{% if paused %}
+<div class="summary-card">
+    <div class="summary-head">
+        <div class="summary-title"><span class="ai-pulse"></span> <span class="ai-text">AI summary</span></div>
+    </div>
+    <div class="summary-text text-secondary">
+        Paused while bulk import is running. Open this email again after the import finishes.
+    </div>
+</div>
+{% else %}
+<div class="summary-card">
+    <div class="summary-head">
+        <div class="summary-title"><span class="ai-pulse"></span> <span class="ai-text">AI summary</span></div>
+        <form method="get" action="/email/{{ email.id }}/summary" hx-get="/email/{{ email.id }}/summary?force=1" hx-target="#summary" hx-swap="innerHTML">
+            <button type="submit" class="btn btn-ghost btn-sm" title="Regenerate summary">↻</button>
+        </form>
+    </div>
+    <div class="summary-text">{{ summary }}</div>
+    {% if route %}
+    <div class="summary-meta">via {{ route }}</div>
+    {% endif %}
+</div>
+{% endif %}

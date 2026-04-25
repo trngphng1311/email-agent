@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Groups — Email Agent</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;700&family=Inter:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+{% set _bg = get_background() %}{% set _theme = get_theme() %}<body class="theme-{{ _theme }}{% if _bg %} has-bg{% endif %}"{% if _bg %} style="--bg-url: url('{{ _bg }}');"{% endif %}>
+    <header class="app-header">
+        <div class="app-header-inner">
+            <div class="flex items-center gap-6">
+                <a href="/" class="logo">Email Agent</a>
+                <nav class="nav">
+                    <a href="/">Dashboard</a>
+                    <a href="/inbox">Inbox</a>
+                    <a href="/groups" class="active">Groups</a>
+                    <a href="/import">Import</a>
+                    <a href="/settings">Settings</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <div class="page">
+        <div class="page-header">
+            <h1>Groups</h1>
+            <p class="lead">
+                Two ways to slice your inbox: by domain (everyone <code>@vietcombank.com.vn</code>),
+                or by topic (normalized subject + sender).
+            </p>
+        </div>
+
+        {# ── Domain groups ─────────────────────────────────── #}
+        <h2 id="domains" style="font-size: 18px; margin-bottom: 12px;">By domain</h2>
+        <p class="text-sm text-secondary mb-4">Senders grouped by the part after <code>@</code>. Click a domain to see its members and copy their addresses for BCC.</p>
+
+        {% if not domains %}
+        <div class="email-empty mb-6">No domains yet — sync some emails first.</div>
+        {% else %}
+        <div class="table-card mb-6">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Domain</th>
+                        <th class="num">Senders</th>
+                        <th class="num">Emails</th>
+                        <th>Last seen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for d in domains %}
+                    <tr {% if selected_domain == d.domain %}style="background: var(--color-accent-soft);"{% endif %}>
+                        <td>
+                            <a href="/groups?domain={{ d.domain|urlencode }}#domains" class="mono">@{{ d.domain }}</a>
+                        </td>
+                        <td class="num">{{ d.sender_count }}</td>
+                        <td class="num"><span class="badge badge-accent">{{ d.email_count }}</span></td>
+                        <td class="text-secondary tabular-nums">{{ (d.last_seen or '')[:10] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if selected_domain and domain_members %}
+        <div class="card mb-8" style="padding: 20px;">
+            <div class="flex items-center justify-between mb-4">
+                <h3 style="font-size: 16px;">Senders in <code class="mono">@{{ selected_domain }}</code></h3>
+                <button
+                    type="button"
+                    class="btn btn-secondary btn-sm"
+                    onclick="copyAddresses(this)"
+                    data-emails="{{ domain_members|map(attribute='email')|join(', ') }}"
+                >
+                    Copy all emails
+                </button>
+            </div>
+            <table class="table" style="border-radius: 0; border-bottom: 0;">
+                <thead>
+                    <tr>
+                        <th>Display name</th>
+                        <th>Email</th>
+                        <th class="num">Mail count</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for m in domain_members %}
+                    <tr>
+                        <td>{{ m.display_name or '—' }}</td>
+                        <td class="mono"><a href="/inbox?sender={{ m.email|urlencode }}">{{ m.email }}</a></td>
+                        <td class="num"><span class="badge">{{ m.mail_count }}</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <script>
+        function copyAddresses(btn) {
+            const emails = btn.dataset.emails;
+            navigator.clipboard.writeText(emails).then(() => {
+                const original = btn.textContent;
+                btn.textContent = 'Copied ✓';
+                setTimeout(() => { btn.textContent = original; }, 1500);
+            });
+        }
+        </script>
+        {% endif %}
+        {% endif %}
+
+        {# ── Topic groups ──────────────────────────────────── #}
+        <h2 id="topics" style="font-size: 18px; margin-bottom: 12px; margin-top: 32px;">By topic</h2>
+        <p class="text-sm text-secondary mb-4">Emails sharing a normalized subject + sender (Re:/Fwd: prefixes stripped).</p>
+
+        {% if not groups %}
+        <div class="email-empty">No topics yet.</div>
+        {% else %}
+        <div class="table-card">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Topic</th>
+                        <th>Sender</th>
+                        <th class="num">Count</th>
+                        <th>Last</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for g in groups %}
+                    <tr>
+                        <td>
+                            <a href="/inbox?topic={{ g.topic|urlencode }}&sender={{ g.sender_email|urlencode }}">{{ g.sample_subject }}</a>
+                        </td>
+                        <td class="mono text-secondary truncate" style="max-width: 260px;" title="{{ g.sender_email }}">
+                            <a href="/inbox?sender={{ g.sender_email|urlencode }}">{{ g.sender_email }}</a>
+                        </td>
+                        <td class="num"><span class="badge badge-accent">{{ g.n }}</span></td>
+                        <td class="text-secondary tabular-nums">{{ g.last_date[:10] }}</td>
+                        <td>
+                            {% if g.any_sensitive %}<span title="Contains sensitive">🔒</span>{% endif %}
+                            {% if g.any_missing_attachment %}<span title="Missing attachment" class="text-warning">⚠️</span>{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

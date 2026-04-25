@@ -1,0 +1,40 @@
+{% if banner %}
+<div class="banner banner-success mb-4">
+    <span><strong>{{ banner }}</strong></span>
+</div>
+{% endif %}
+
+<div class="email-list">
+    {% for r in rows %}
+    <a href="/email/{{ r.id }}" class="email-card">
+        <span class="from">{{ r.sender_email }}</span>
+        <span class="subject">{{ r.subject }}</span>
+        {% if r.label_reason %}
+        <span class="reason">{{ r.label_reason }}</span>
+        {% else %}
+        <span class="reason"></span>
+        {% endif %}
+        <div class="meta">
+            <span class="date">{{ r.date[:10] }}</span>
+            <span class="badge
+                {% if r.label == 'IMPORTANT' %}badge-important
+                {% elif r.label == 'PERSONAL' %}badge-personal
+                {% elif r.label == 'WORK' %}badge-work
+                {% elif r.label == 'NEWSLETTER' %}badge-newsletter
+                {% elif r.label == 'PROMOTIONAL' %}badge-promotional
+                {% elif r.label == 'SPAM' %}badge-spam
+                {% else %}badge{% endif %}">{{ r.label }}</span>
+            <div class="meta-bottom">
+                <span class="flags">
+                    {% if r.sensitive %}<span title="Sensitive — routed locally">🔒</span>{% endif %}
+                    {% if r.has_attachment %}<span title="Attachment">📎</span>{% endif %}
+                    {% if r.missing_attachment %}<span title="Body mentions an attachment but none was attached" class="text-warning">⚠️</span>{% endif %}
+                </span>
+                <span class="route">{{ r.llm_route }}</span>
+            </div>
+        </div>
+    </a>
+    {% else %}
+    <div class="email-empty">No emails match these filters.</div>
+    {% endfor %}
+</div>

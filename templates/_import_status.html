@@ -1,0 +1,53 @@
+{# Out-of-band button update: replaces the #import-submit button in the form #}
+<button
+    id="import-submit"
+    hx-swap-oob="true"
+    form="import-form"
+    type="submit"
+    class="btn btn-primary btn-block"
+    {% if status and status.state in ('running', 'cancelling') %}disabled{% endif %}
+>
+    {% if status and status.state == 'running' %}Import in progress…
+    {% elif status and status.state == 'cancelling' %}Cancelling…
+    {% else %}Start import{% endif %}
+</button>
+
+{% if status %}
+<div class="banner
+    {% if status.state == 'running' %}banner-info
+    {% elif status.state == 'cancelling' %}banner-warning
+    {% elif status.state == 'done' %}banner-success
+    {% elif status.state == 'cancelled' %}banner-warning
+    {% else %}banner-error{% endif %}">
+    {% if status.state == 'running' %}
+    <div>
+        <strong>Importing… {{ status.processed }} / {{ status.total }}</strong>
+        <div class="small">{{ status.classified }} classified, {{ status.skipped }} skipped (cached)</div>
+        {% if status.current %}<div class="small italic">Current: {{ status.current }}</div>{% endif %}
+    </div>
+    <form method="post" action="/import/cancel">
+        <button type="submit" class="btn btn-secondary btn-sm">Cancel</button>
+    </form>
+    {% elif status.state == 'cancelling' %}
+    <div>
+        <strong>Cancelling… waiting for current email to finish.</strong>
+        <div class="small">{{ status.classified }} classified, {{ status.skipped }} skipped so far.</div>
+    </div>
+    {% elif status.state == 'done' %}
+    <div>
+        <strong>Import complete.</strong>
+        <div class="small">Processed {{ status.processed }} emails: {{ status.classified }} newly classified, {{ status.skipped }} already cached.</div>
+    </div>
+    {% elif status.state == 'cancelled' %}
+    <div>
+        <strong>Import cancelled.</strong>
+        <div class="small">Stopped at {{ status.processed }}: {{ status.classified }} classified, {{ status.skipped }} skipped before stop.</div>
+    </div>
+    {% elif status.state == 'error' %}
+    <div>
+        <strong>Import failed.</strong>
+        <div class="small mono">{{ status.error }}</div>
+    </div>
+    {% endif %}
+</div>
+{% endif %}

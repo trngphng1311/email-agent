@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Import — Email Agent</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;700&family=Inter:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+</head>
+{% set _bg = get_background() %}{% set _theme = get_theme() %}<body class="theme-{{ _theme }}{% if _bg %} has-bg{% endif %}"{% if _bg %} style="--bg-url: url('{{ _bg }}');"{% endif %}>
+    <header class="app-header">
+        <div class="app-header-inner">
+            <div class="flex items-center gap-6">
+                <a href="/" class="logo">Email Agent</a>
+                <nav class="nav">
+                    <a href="/">Dashboard</a>
+                    <a href="/inbox">Inbox</a>
+                    <a href="/groups">Groups</a>
+                    <a href="/import" class="active">Import</a>
+                    <a href="/settings">Settings</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <div class="page page-narrow">
+        <div class="page-header">
+            <h1>Import email history</h1>
+            <p class="lead">
+                Pull older Gmail messages into the dashboard. Already-imported emails are skipped automatically.
+                Sensitive mail routes through local Ollama (~10–40 s per email), so a batch of 100 mixed emails
+                can take 30+ minutes. Start small.
+            </p>
+        </div>
+
+        <div
+            id="status"
+            class="mb-6"
+            hx-get="/import/status"
+            hx-trigger="load, every 3s"
+            hx-swap="innerHTML"
+        >
+            {% include "_import_status.html" %}
+        </div>
+
+        <form id="import-form" method="post" action="/import" class="form-card">
+            <div class="field-row">
+                <div>
+                    <label class="label">From (inclusive)</label>
+                    <input type="date" name="after" value="{{ default_after }}" class="input">
+                </div>
+                <div>
+                    <label class="label">To (exclusive)</label>
+                    <input type="date" name="before" value="{{ default_before }}" class="input">
+                </div>
+            </div>
+
+            <div>
+                <label class="label">Max emails</label>
+                <input type="number" name="count" value="30" min="1" max="2000" class="input">
+                <p class="help-text">Start small (20–50) to gauge speed on your hardware.</p>
+            </div>
+
+            <div>
+                <label class="label">Gmail query (optional)</label>
+                <input type="text" name="query" placeholder="e.g. from:boss@company.com OR has:attachment" class="input">
+                <p class="help-text">
+                    Any <a href="https://support.google.com/mail/answer/7190" target="_blank">Gmail search</a>
+                    syntax works. Combined with the date range above.
+                </p>
+            </div>
+
+            <button
+                id="import-submit"
+                type="submit"
+                class="btn btn-primary btn-block"
+                {% if status and status.state in ('running', 'cancelling') %}disabled{% endif %}
+            >
+                {% if status and status.state == 'running' %}Import in progress…
+                {% elif status and status.state == 'cancelling' %}Cancelling…
+                {% else %}Start import{% endif %}
+            </button>
+        </form>
+    </div>
+</body>
+</html>

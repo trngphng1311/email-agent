@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ email.subject }} — Email Agent</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;700&family=Inter:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+</head>
+{% set _bg = get_background() %}{% set _theme = get_theme() %}<body class="theme-{{ _theme }}{% if _bg %} has-bg{% endif %}"{% if _bg %} style="--bg-url: url('{{ _bg }}');"{% endif %}>
+    <header class="app-header">
+        <div class="app-header-inner">
+            <div class="flex items-center gap-6">
+                <a href="/" class="logo">Email Agent</a>
+                <nav class="nav">
+                    <a href="/">Dashboard</a>
+                    <a href="/inbox">Inbox</a>
+                    <a href="/groups">Groups</a>
+                    <a href="/import">Import</a>
+                    <a href="/settings">Settings</a>
+                </nav>
+            </div>
+            <a href="/inbox" class="btn btn-ghost btn-sm">← Back to inbox</a>
+        </div>
+    </header>
+
+    <div class="page page-narrow">
+        <div class="page-header">
+            <h1>{{ email.subject }}</h1>
+            <div class="flex flex-wrap items-center gap-3 mt-3 text-sm text-secondary">
+                <span><span class="text-secondary">From</span> <span class="mono text-primary">{{ email.sender_email }}</span></span>
+                <span class="text-muted">·</span>
+                <span class="tabular-nums">{{ email.date[:19] }}</span>
+                <span class="badge
+                    {% if email.label == 'IMPORTANT' %}badge-important
+                    {% elif email.label == 'PERSONAL' %}badge-personal
+                    {% elif email.label == 'WORK' %}badge-work
+                    {% elif email.label == 'NEWSLETTER' %}badge-newsletter
+                    {% elif email.label == 'PROMOTIONAL' %}badge-promotional
+                    {% elif email.label == 'SPAM' %}badge-spam
+                    {% else %}badge{% endif %}">{{ email.label }}</span>
+                {% if email.sensitive %}<span title="Sensitive — routed locally">🔒 sensitive</span>{% endif %}
+                {% if email.has_attachment %}<span>📎 attachment</span>{% endif %}
+                {% if email.missing_attachment %}<span class="text-warning">⚠️ missing attachment</span>{% endif %}
+                <span class="font-medium
+                    {% if reply_status == 'awaiting_reply' and not forced %}text-error
+                    {% elif reply_status == 'replied' %}text-success
+                    {% else %}text-secondary{% endif %}">
+                    {% if forced %}Reply forced{% else %}{{ reply_status.replace('_', ' ')|title }}{% endif %}
+                </span>
+            </div>
+            {% if email.label_reason %}
+            <p class="text-sm text-secondary italic mt-2">{{ email.label_reason }}</p>
+            {% endif %}
+        </div>
+
+        {% if request.query_params.get('sent') %}
+        <div class="banner banner-success mb-6">
+            <span><strong>Reply sent.</strong></span>
+        </div>
+        {% endif %}
+
+        {# AI summary — manual, generates only when user clicks #}
+        <section id="summary" class="mb-6">
+            {% if email.summary %}
+            <div class="summary-card">
+                <div class="summary-head">
+                    <div class="summary-title"><span class="ai-pulse"></span> <span class="ai-text">AI summary</span></div>
+                    <button
+                        type="button"
+                        class="btn btn-ghost btn-sm"
+                        hx-get="/email/{{ email.id }}/summary?force=1"
+                        hx-target="#summary"
+                        hx-swap="innerHTML"
+                        title="Regenerate"
+                    >↻</button>
+                </div>
+                <div class="summary-text">{{ email.summary }}</div>
+                {% if email.summary_route %}
+                <div class="summary-meta">via {{ email.summary_route }}</div>
+                {% endif %}
+            </div>
+            {% else %}
+            <div class="summary-card">
+                <div class="summary-head">
+                    <div class="summary-title"><span class="ai-pulse"></span> <span class="ai-text">AI summary</span></div>
+                    <button
+                        type="button"
+                        class="btn btn-secondary btn-sm"
+                        hx-get="/email/{{ email.id }}/summary"
+                        hx-target="#summary"
+                        hx-swap="innerHTML"
+                    >Generate</button>
+                </div>
+                <div class="summary-text text-secondary text-sm">
+                    Click <strong>Generate</strong> to summarize this email with AI.
+                    {% if email.sensitive %}
+                    Routed locally via Ollama (10–40 s).
+                    {% else %}
+                    Routed via Groq (~1–2 s).
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </section>
+
+        <section class="mb-8">
+            <h2 class="section-title">
+                Conversation
+                <span class="text-muted" style="text-transform: none; letter-spacing: 0;">
+                    ({{ thread|length }} {{ 'message' if thread|length == 1 else 'messages' }})
+                </span>
+            </h2>
+
+            {% if not thread %}
+            <div class="card">
+                {% if email.body_html %}
+                <iframe
+                    sandbox
+                    srcdoc="{{ email.body_html }}"
+                    style="width: 100%; height: 540px; border: 0; background: white;"
+                    title="Email body"
+                ></iframe>
+                {% else %}
+                <pre>{{ email.body }}</pre>
+                {% endif %}
+            </div>
+            {% else %}
+            <div class="thread">
+                {% for msg in thread %}
+                <article id="msg-{{ msg.id }}" class="message {% if msg.is_me %}message-self{% endif %} {% if msg.id == email.id %}message-active{% endif %}">
+                    <header class="message-header">
+                        <div class="message-from">
+                            {% if msg.is_me %}
+                            <span class="badge badge-accent">You</span>
+                            <span class="text-secondary text-xs">sent</span>
+                            {% else %}
+                            <span>{{ msg.sender }}</span>
+                            {% endif %}
+                            {% if msg.id == email.id %}
+                            <span class="badge badge-accent">this message</span>
+                            {% endif %}
+                        </div>
+                        <span class="message-meta">{{ msg.date[:16] }}</span>
+                    </header>
+                    <div class="message-body">
+                        {% if msg.body_html %}
+                        <iframe
+                            sandbox="allow-same-origin"
+                            srcdoc="{{ msg.body_html }}"
+                            onload="try { this.style.height = Math.min(800, this.contentWindow.document.body.scrollHeight + 24) + 'px'; } catch(e) {}"
+                            style="height: 220px;"
+                            title="Message body"
+                        ></iframe>
+                        {% else %}
+                        <pre>{{ msg.body }}</pre>
+                        {% endif %}
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </section>
+
+        {% if reply_status == 'awaiting_reply' %}
+            {% if bulk_busy %}
+            <div class="banner banner-warning">
+                <span>
+                    Draft generation paused while bulk import is running.
+                    Check <a href="/import" class="text-accent">import status</a>, then come back.
+                </span>
+            </div>
+            {% elif draft %}
+            <section class="form-card">
+                <div class="flex items-baseline justify-between mb-3">
+                    <h2 class="section-title" style="margin: 0;">
+                        Drafted reply
+                        <span class="text-muted" style="text-transform: none; letter-spacing: 0; font-weight: 400;">via {{ draft.llm_route }}</span>
+                    </h2>
+                </div>
+
+                {% if forced %}
+                <div class="banner banner-warning text-xs">
+                    <span>You overrode the classifier ({{ email.label }}). Replying to actual spam leaks your address.</span>
+                </div>
+                {% endif %}
+
+                <form method="post" action="/email/{{ email.id }}/regenerate" class="flex gap-2">
+                    <input
+                        type="text"
+                        name="instruction"
+                        placeholder="Ask AI to adjust — e.g. 'make it more formal'"
+                        class="input"
+                    />
+                    <button type="submit" class="btn btn-secondary">Regenerate</button>
+                </form>
+
+                <form method="post" action="/email/{{ email.id }}/send" class="space-y-3">
+                    <textarea name="draft_text" rows="8" class="textarea">{{ draft.draft_text }}</textarea>
+
+                    <div style="padding-top: 12px; border-top: 1px solid var(--color-border); display: flex; flex-direction: column; gap: 10px;">
+                        <label class="label" style="margin: 0;">BCC (optional)</label>
+                        <input
+                            type="text"
+                            name="bcc"
+                            placeholder="comma-separated emails — paste from Groups page"
+                            class="input"
+                        >
+                        <p class="help-text" style="margin: 0;">
+                            Hidden recipients. <a href="/groups#domains" class="text-accent">Pick a group</a> on the Groups page to copy addresses.
+                        </p>
+                    </div>
+
+                    {% if signature %}
+                    <div class="flex items-center justify-between gap-3" style="padding-top: 12px; border-top: 1px solid var(--color-border);">
+                        <label class="flex items-center gap-2 text-sm text-secondary" style="cursor: pointer;">
+                            <input type="checkbox" name="include_signature" value="1" class="checkbox" checked>
+                            Include my signature
+                        </label>
+                        <details class="text-xs text-secondary">
+                            <summary>Preview signature</summary>
+                            <pre class="preview-block">--
+{{ signature }}</pre>
+                        </details>
+                    </div>
+                    {% else %}
+                    <p class="text-xs text-muted" style="padding-top: 12px; border-top: 1px solid var(--color-border);">
+                        No signature. <a href="/settings" class="text-accent">Add one in Settings</a>.
+                    </p>
+                    {% endif %}
+
+                    <div class="flex items-center justify-between">
+                        <p class="text-xs text-muted">
+                            Sends to <span class="font-medium text-secondary mono">{{ email.sender_email }}</span>. Threads under the original.
+                        </p>
+                        <div class="flex gap-2">
+                            <button type="submit" formaction="/email/{{ email.id }}/save" class="btn btn-secondary">Save draft</button>
+                            <button
+                                type="submit"
+                                class="btn btn-primary"
+                                onclick="return confirm('Send this reply to {{ email.sender_email }}?')"
+                            >
+                                Send reply
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </section>
+            {% else %}
+            <section class="form-card">
+                <h2 class="section-title">Drafted reply</h2>
+                <p class="text-sm text-secondary mb-4">
+                    No draft yet. AI will read this email and propose a reply.
+                    <span class="block text-xs text-muted mt-1">
+                        {% if email.sensitive %}Sensitive — drafted locally via Ollama (10–40 s).
+                        {% else %}Non-sensitive — drafted via Groq (1–2 s).{% endif %}
+                    </span>
+                </p>
+
+                <form method="post" action="/email/{{ email.id }}/regenerate" class="space-y-3">
+                    <input
+                        type="text"
+                        name="instruction"
+                        placeholder="Optional instruction — e.g. 'ask for transaction reference'"
+                        class="input"
+                    />
+                    <button type="submit" class="btn btn-primary">Generate draft</button>
+                </form>
+            </section>
+            {% endif %}
+        {% elif reply_status == 'replied' %}
+        <div class="banner banner-success">
+            <span>
+                <strong>You've already replied to this thread.</strong>
+                {% if draft and draft.status == 'sent' %}
+                <span class="small">Sent via Email Agent at {{ draft.sent_at }}.</span>
+                {% endif %}
+            </span>
+        </div>
+        {% else %}
+        <div class="card flex items-center justify-between gap-3">
+            <span class="text-sm text-secondary">No reply needed ({{ email.label }}).</span>
+            <a href="/email/{{ email.id }}?reply_anyway=1" class="btn btn-secondary btn-sm">Reply anyway</a>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

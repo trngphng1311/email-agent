@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Settings — Email Agent</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;700&family=Inter:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+{% set _bg = get_background() %}{% set _theme = get_theme() %}<body class="theme-{{ _theme }}{% if _bg %} has-bg{% endif %}"{% if _bg %} style="--bg-url: url('{{ _bg }}');"{% endif %}>
+    <header class="app-header">
+        <div class="app-header-inner">
+            <div class="flex items-center gap-6">
+                <a href="/" class="logo">Email Agent</a>
+                <nav class="nav">
+                    <a href="/">Dashboard</a>
+                    <a href="/inbox">Inbox</a>
+                    <a href="/groups">Groups</a>
+                    <a href="/import">Import</a>
+                    <a href="/settings" class="active">Settings</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <div class="page page-narrow">
+        <div class="page-header">
+            <h1>Settings</h1>
+            <p class="lead">Customize your signature, color theme, and dashboard background.</p>
+        </div>
+
+        {% if saved %}
+        <div class="banner banner-success mb-6">
+            <span><strong>Saved.</strong> Refresh any page to see theme/background changes everywhere.</span>
+        </div>
+        {% endif %}
+
+        <form method="post" action="/settings" class="form-card">
+            {# ── Color theme ──────────────────────────────────── #}
+            <div>
+                <label class="label">Color theme</label>
+                <p class="help-text" style="margin-bottom: 12px; margin-top: 0;">
+                    Pick a primary + accent palette. Affects buttons, focus rings, headings, and accents app-wide.
+                </p>
+                <div class="theme-grid">
+                    {% for t in themes %}
+                    <label class="theme-option">
+                        <input type="radio" name="theme" value="{{ t.key }}" {% if theme == t.key %}checked{% endif %}>
+                        <div class="theme-swatch" style="background: linear-gradient(135deg, {{ t.primary }} 0%, {{ t.primary }} 50%, {{ t.accent }} 50%, {{ t.accent }} 100%);"></div>
+                        <span>{{ t.name }}</span>
+                        <span class="check">✓</span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <hr class="divider">
+
+            {# ── Background image ─────────────────────────────── #}
+            <div>
+                <label class="label">Background image URL</label>
+                <p class="help-text" style="margin-bottom: 8px; margin-top: 0;">
+                    Image is blurred behind a translucent veil for legibility. Paste any direct image URL,
+                    or click <em>Try demo</em> to test.
+                </p>
+                <input
+                    type="url"
+                    name="background_url"
+                    value="{{ background_url }}"
+                    placeholder="https://images.example.com/your-photo.jpg"
+                    class="input"
+                >
+                <div class="flex gap-2 mt-2">
+                    <button
+                        type="button"
+                        class="btn btn-secondary btn-sm"
+                        onclick="document.querySelector('[name=background_url]').value='https://images.pexels.com/photos/29584025/pexels-photo-29584025.jpeg'"
+                    >Try demo</button>
+                    <button
+                        type="button"
+                        class="btn btn-ghost btn-sm"
+                        onclick="document.querySelector('[name=background_url]').value=''"
+                    >Clear</button>
+                </div>
+                {% if background_url %}
+                <div class="mt-3" style="border: 1px solid var(--color-border); border-radius: var(--radius); overflow: hidden; max-height: 120px;">
+                    <img src="{{ background_url }}" alt="Background preview" style="width: 100%; height: 120px; object-fit: cover; display: block;">
+                </div>
+                {% endif %}
+            </div>
+
+            <hr class="divider">
+
+            {# ── Signature ────────────────────────────────────── #}
+            <div>
+                <label class="label">Reply signature</label>
+                <p class="help-text" style="margin-bottom: 8px; margin-top: 0;">
+                    Plain text, multi-line. Appended below <code>--</code> when "Include signature" is checked
+                    on the send form.
+                </p>
+                <textarea
+                    name="signature"
+                    rows="6"
+                    placeholder="Your name&#10;Title · Company&#10;phone · email"
+                    class="textarea"
+                >{{ signature }}</textarea>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block">Save settings</button>
+        </form>
+    </div>
+</body>
+</html>

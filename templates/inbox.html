@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Inbox — Email Agent</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;700&family=Inter:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+</head>
+{% set _bg = get_background() %}{% set _theme = get_theme() %}<body class="theme-{{ _theme }}{% if _bg %} has-bg{% endif %}"{% if _bg %} style="--bg-url: url('{{ _bg }}');"{% endif %}>
+    <header class="app-header">
+        <div class="app-header-inner">
+            <div class="flex items-center gap-6">
+                <a href="/" class="logo">Email Agent</a>
+                <nav class="nav">
+                    <a href="/">Dashboard</a>
+                    <a href="/inbox" class="active">Inbox</a>
+                    <a href="/groups">Groups</a>
+                    <a href="/import">Import</a>
+                    <a href="/settings">Settings</a>
+                </nav>
+            </div>
+            <div class="app-header-actions">
+                <form action="/inbox" method="get" style="display: inline-flex;">
+                    <input type="text" name="q" value="{{ q }}" placeholder="Search subject, sender, body…" class="search-input">
+                </form>
+                <span class="indicator-row htmx-indicator">
+                    <span class="spinner"></span>
+                    Syncing…
+                </span>
+                <button
+                    class="btn btn-primary btn-sm"
+                    hx-post="/sync"
+                    hx-target="#inbox"
+                    hx-swap="innerHTML"
+                    hx-indicator=".htmx-indicator"
+                    hx-disabled-elt="this"
+                >
+                    Sync now
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="app-shell">
+        <aside class="sidebar">
+            <div>
+                <h2 class="section-title">Filters</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label class="label">Label</label>
+                        <select
+                            name="label"
+                            class="select"
+                            hx-get="/rows"
+                            hx-include="[name='sender'], [name='topic'], [name='q']"
+                            hx-target="#inbox"
+                            hx-trigger="change"
+                            hx-swap="innerHTML"
+                        >
+                            <option value="">All</option>
+                            {% for l in labels %}
+                            <option value="{{ l }}" {% if l == label %}selected{% endif %}>{{ l }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="label">Sender contains</label>
+                        <input
+                            name="sender"
+                            value="{{ sender }}"
+                            type="text"
+                            placeholder="e.g. vietcombank"
+                            class="input"
+                            hx-get="/rows"
+                            hx-include="[name='label'], [name='topic'], [name='q']"
+                            hx-target="#inbox"
+                            hx-trigger="keyup changed delay:400ms"
+                            hx-swap="innerHTML"
+                        >
+                    </div>
+                    <input type="hidden" name="topic" value="{{ topic }}">
+                    <input type="hidden" name="q" value="{{ q }}">
+                </div>
+            </div>
+
+            <div>
+                <h2 class="section-title">Showing</h2>
+                <div class="text-sm text-secondary">
+                    <span class="text-accent font-bold">{{ count }}</span> emails
+                    {% if q %}<div class="text-xs text-muted mt-1">matching "{{ q }}"</div>{% endif %}
+                </div>
+            </div>
+
+            <div>
+                <h2 class="section-title">People</h2>
+                <ul class="people-list">
+                    {% for s in senders %}
+                    <li>
+                        <a href="/inbox?sender={{ s.email }}" title="{{ s.email }}">{{ s.display_name or s.email }}</a>
+                        <span class="count">{{ s.mail_count }}</span>
+                    </li>
+                    {% else %}
+                    <li class="text-sm text-muted">No senders yet.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </aside>
+
+        <main class="main">
+            {% if profile %}
+            <div class="card profile-card mb-6">
+                <div>
+                    <h3 class="profile-name">{{ profile.display_name or profile.email }}</h3>
+                    <div class="profile-meta">
+                        <span class="profile-email">{{ profile.email }}</span> ·
+                        {{ profile.mail_count }} emails ·
+                        first {{ profile.first_seen[:10] if profile.first_seen else '—' }},
+                        last {{ profile.last_seen[:10] if profile.last_seen else '—' }}
+                    </div>
+                </div>
+                <a href="/inbox" class="btn btn-secondary btn-sm">Clear filter</a>
+            </div>
+            {% elif topic %}
+            <div class="card profile-card mb-6">
+                <div>
+                    <h3 class="profile-name">Topic</h3>
+                    <div class="profile-meta mono">{{ topic }} <span class="text-muted">— {{ count }} emails</span></div>
+                </div>
+                <a href="/inbox" class="btn btn-secondary btn-sm">Clear filter</a>
+            </div>
+            {% elif q %}
+            <div class="card profile-card mb-6">
+                <div>
+                    <h3 class="profile-name">Search</h3>
+                    <div class="profile-meta">Results for "<span class="mono">{{ q }}</span>" — {{ count }} matches</div>
+                </div>
+                <a href="/inbox" class="btn btn-secondary btn-sm">Clear search</a>
+            </div>
+            {% endif %}
+
+            <div id="inbox">
+                {% include "_rows.html" %}
+            </div>
+        </main>
+    </div>
+</body>
+</html>

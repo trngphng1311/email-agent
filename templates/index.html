@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard — Email Agent</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;700&family=Inter:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+</head>
+{% set _bg = get_background() %}{% set _theme = get_theme() %}<body class="theme-{{ _theme }}{% if _bg %} has-bg{% endif %}"{% if _bg %} style="--bg-url: url('{{ _bg }}');"{% endif %}>
+    <header class="app-header">
+        <div class="app-header-inner">
+            <div class="flex items-center gap-6">
+                <a href="/" class="logo">Email Agent</a>
+                <nav class="nav">
+                    <a href="/" class="active">Dashboard</a>
+                    <a href="/inbox">Inbox</a>
+                    <a href="/groups">Groups</a>
+                    <a href="/import">Import</a>
+                    <a href="/settings">Settings</a>
+                </nav>
+            </div>
+            <div class="app-header-actions">
+                <form action="/inbox" method="get" style="display: inline-flex;">
+                    <input type="text" name="q" placeholder="Search subject, sender, body…" class="search-input">
+                </form>
+                <span class="indicator-row htmx-indicator">
+                    <span class="spinner"></span>
+                    Syncing…
+                </span>
+                <button
+                    class="btn btn-primary btn-sm"
+                    hx-post="/sync"
+                    hx-target="this"
+                    hx-swap="none"
+                    hx-indicator=".htmx-indicator"
+                    hx-disabled-elt="this"
+                    onclick="setTimeout(() => location.reload(), 100)"
+                >
+                    Sync now
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="page">
+        <div class="page-header">
+            <h1>Welcome back</h1>
+            <p class="lead">Your inbox at a glance — AI-curated suggestions, recent activity, and where things stand.</p>
+        </div>
+
+        <div class="bento">
+            {# ── Stat cards ─────────────────────────────────────── #}
+            <div class="bento-card bento-3 stat-card no-hover">
+                <div class="stat-top">
+                    <span class="stat-label">Total emails</span>
+                </div>
+                <div class="stat-value">{{ stats.total or 0 }}</div>
+                <div class="stat-foot">In your local store</div>
+            </div>
+
+            <div class="bento-card bento-3 stat-card no-hover">
+                <div class="stat-top">
+                    <span class="stat-label">Awaiting reply</span>
+                    <span class="ai-pulse" title="Tracked by AI"></span>
+                </div>
+                <div class="stat-value">{{ stats.awaiting }}</div>
+                <div class="stat-foot">IMPORTANT · PERSONAL · WORK</div>
+            </div>
+
+            <div class="bento-card bento-3 stat-card no-hover">
+                <div class="stat-top">
+                    <span class="stat-label">Sensitive (local-only)</span>
+                </div>
+                <div class="stat-value">{{ stats.sensitive_count or 0 }}</div>
+                <div class="stat-foot">Routed via Ollama, never sent to cloud</div>
+            </div>
+
+            <div class="bento-card bento-3 stat-card no-hover">
+                <div class="stat-top">
+                    <span class="stat-label">Last sync</span>
+                </div>
+                <div class="stat-value" style="font-size: 24px;">{{ last_sync or '—' }}</div>
+                <div class="stat-foot">Click Sync now in the header</div>
+            </div>
+
+            {# ── AI suggestions (large, AI-accented) ────────────── #}
+            <div class="bento-card ai-card bento-8">
+                <div class="card-title">
+                    <h3><span class="ai-pulse"></span> <span class="ai-text">AI suggestions</span></h3>
+                    <a href="/inbox?label=IMPORTANT" class="card-title-link">View all →</a>
+                </div>
+                <p class="text-xs text-secondary mb-4" style="margin-top: -8px;">
+                    Recent emails the agent thinks deserve a reply. Open one to draft a response.
+                </p>
+                <div class="list-compact">
+                    {% for s in ai_suggestions %}
+                    <a class="item" href="/email/{{ s.id }}">
+                        <div class="item-main">
+                            <div class="item-subject">{{ s.subject }}</div>
+                            <div class="item-from">{{ s.sender_email }}</div>
+                        </div>
+                        <div class="item-aside">
+                            <span class="badge
+                                {% if s.label == 'IMPORTANT' %}badge-important
+                                {% elif s.label == 'PERSONAL' %}badge-personal
+                                {% elif s.label == 'WORK' %}badge-work
+                                {% else %}badge{% endif %}">{{ s.label }}</span>
+                            <span>{{ s.date[:10] }}</span>
+                        </div>
+                    </a>
+                    {% else %}
+                    <div class="text-secondary text-sm">Nothing awaiting reply right now. Nice.</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            {# ── Quick actions ──────────────────────────────────── #}
+            <div class="bento-card bento-4 no-hover">
+                <div class="card-title"><h3>Quick actions</h3></div>
+                <div class="space-y-3">
+                    <button
+                        class="btn btn-primary btn-block"
+                        hx-post="/sync"
+                        hx-target="this"
+                        hx-swap="none"
+                        hx-indicator=".htmx-indicator"
+                        hx-disabled-elt="this"
+                        onclick="setTimeout(() => location.reload(), 100)"
+                    >
+                        Sync now
+                    </button>
+                    <a href="/import" class="btn btn-secondary btn-block">Import history</a>
+                    <a href="/groups" class="btn btn-secondary btn-block">Browse by topic</a>
+                    <a href="/settings" class="btn btn-secondary btn-block">Open settings</a>
+                </div>
+            </div>
+
+            {# ── Recent inbox ───────────────────────────────────── #}
+            <div class="bento-card bento-8 no-hover">
+                <div class="card-title">
+                    <h3>Recent inbox</h3>
+                    <a href="/inbox" class="card-title-link">View full inbox →</a>
+                </div>
+                <div class="list-compact">
+                    {% for r in recent %}
+                    <a class="item" href="/email/{{ r.id }}">
+                        <div class="item-main">
+                            <div class="item-subject">{{ r.subject }}</div>
+                            <div class="item-from">{{ r.sender_email }}</div>
+                        </div>
+                        <div class="item-aside">
+                            {% if r.sensitive %}<span title="Sensitive — routed locally">🔒</span>{% endif %}
+                            {% if r.has_attachment %}<span title="Attachment">📎</span>{% endif %}
+                            <span class="badge
+                                {% if r.label == 'IMPORTANT' %}badge-important
+                                {% elif r.label == 'PERSONAL' %}badge-personal
+                                {% elif r.label == 'WORK' %}badge-work
+                                {% elif r.label == 'NEWSLETTER' %}badge-newsletter
+                                {% elif r.label == 'PROMOTIONAL' %}badge-promotional
+                                {% elif r.label == 'SPAM' %}badge-spam
+                                {% else %}badge{% endif %}">{{ r.label }}</span>
+                        </div>
+                    </a>
+                    {% else %}
+                    <div class="text-secondary text-sm">No emails yet — click <strong>Sync now</strong>.</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            {# ── Domain groups (small) ───────────────────────────── #}
+            <div class="bento-card bento-4 no-hover">
+                <div class="card-title">
+                    <h3>Top domains</h3>
+                    <a href="/groups#domains" class="card-title-link">All →</a>
+                </div>
+                {% if top_domains %}
+                <div class="list-compact">
+                    {% for d in top_domains %}
+                    <a class="item" href="/groups?domain={{ d.domain|urlencode }}#domains">
+                        <div class="item-main">
+                            <div class="item-subject mono" style="font-size: 12px;">@{{ d.domain }}</div>
+                            <div class="item-from">{{ d.sender_count }} sender{{ 's' if d.sender_count != 1 else '' }}</div>
+                        </div>
+                        <div class="item-aside">
+                            <span class="badge badge-accent">{{ d.email_count }}</span>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-secondary text-sm">No senders yet.</div>
+                {% endif %}
+            </div>
+
+            {# ── Top senders ────────────────────────────────────── #}
+            <div class="bento-card bento-12 no-hover">
+                <div class="card-title">
+                    <h3>Top senders</h3>
+                    <a href="/inbox" class="card-title-link">All people →</a>
+                </div>
+                {% if top_senders %}
+                <div class="sender-grid">
+                    {% for s in top_senders %}
+                    <a href="/inbox?sender={{ s.email }}" class="sender-tile" title="{{ s.email }}">
+                        <span class="num">{{ s.mail_count }}</span>
+                        <span class="name">{{ s.display_name or s.email }}</span>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-secondary text-sm">No senders yet.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</body>
+</html>
